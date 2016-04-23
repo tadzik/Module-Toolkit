@@ -3,11 +3,15 @@ use Module::Toolkit::Distribution;
 use JSON::Fast;
 
 has $.projects-json;
-has @!projects;
+has %!projects;
 
 method project-list {
     self.init-projects();
-    return @!projects;
+    return %!projects.values;
+}
+
+method add-project(Distribution $dist) {
+    %!projects{$dist.Str} = $dist
 }
 
 method init-projects { once {
@@ -23,7 +27,7 @@ method init-projects { once {
         my @dep  = |($dist<depends>:delete);
         my @bdep = |($dist<build-depends>:delete);
         my @tdep = |($dist<test-depends>:delete);
-        @!projects.push: Module::Toolkit::Distribution.new(
+        self.add-project: Module::Toolkit::Distribution.new(
             |$dist, 
             depends       => @dep,
             build-depends => @bdep,
@@ -99,7 +103,7 @@ method fetch-projects {
 method get-project(Str() $p) {
     self.init-projects();
     my @cands;
-    for @!projects {
+    for self.project-list {
         if .name eq $p {
             @cands.push: $_
         }
@@ -107,7 +111,7 @@ method get-project(Str() $p) {
     if +@cands {
         return @cands.sort(*.version).reverse[0];
     }
-    for @!projects -> $cand {
+    for self.project-list -> $cand {
         if $cand.provides.keys.grep($p) {
             return $cand;
         }

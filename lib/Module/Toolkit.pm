@@ -27,8 +27,12 @@ method is-installed(Distribution $dist) {
     ) or so any(@repos).prefix.child('dist').child($dist.id).IO.e;
 }
 
-method fetch(Distribution $dist, IO::Path() $to) {
+multi method fetch(Distribution $dist, IO::Path() $to) {
     my $url = $dist.source-url // $dist.support<source>;
+    $.fetcher.fetch($url, $to);
+}
+
+multi method fetch(Str $url, IO::Path() $to) {
     $.fetcher.fetch($url, $to);
 }
 

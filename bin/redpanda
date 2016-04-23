@@ -2,6 +2,7 @@
 use Module::Toolkit;
 use Shell::Command;
 use File::Temp;
+use JSON::Fast;
 
 my $mt = Module::Toolkit.new;
 
@@ -42,6 +43,42 @@ sub do-resolve(Distribution $dist,
     say "Successfully installed {$dist.name}";
 }
 
+sub find-meta-file(IO::Path() $dir) {
+    if $dir.child('META6.json').f {
+        return $dir.child('META6.json')
+    }
+    if $dir.child('META.info').f {
+        return $dir.child('META.info')
+    }
+}
+
+sub dist-from-location(Str $location) {
+    my $tmpdir = tempdir(:tempdir($workdir), :!unlink);
+    mkpath $tmpdir;
+    try {
+        $mt.fetch($location, $tmpdir.IO);
+        CATCH { default {
+            return False;
+        }}
+    }
+
+    my $meta = find-meta-file($tmpdir.IO);
+    if $meta {
+        my $dist = from-json slurp $meta;
+        my @dep  = |($dist<depends>:delete);
+        my @bdep = |($dist<build-depends>:delete);
+        my @tdep = |($dist<test-depends>:delete);
+
+        return Module::Toolkit::Distribution.new(
+            |$dist,
+            depends       => @dep,
+            build-depends => @bdep,
+            test-depends  => @tdep,
+        );
+    }
+    return False;
+}
+
 sub MAIN(*@targets,
          Bool :$n = False, Bool :$notests = $n,
          Bool :$f = False, Bool :$force   = $f,
@@ -58,8 +95,18 @@ sub MAIN(*@targets,
 
     TARGETLOOP: for @targets -> $name {
         my $dist = $mt.get-project($name);
+        unless $dist {
+            $dist = dist-from-location($name);
+            if $dist {
+                say "Installing {$dist.name} "
+                  ~ "from a custom location $name";
+            } else {
+                say "I don't know how to install $name :(";
+                exit 1;
+            }
+        }
         if should-skip($dist) {
-            say "$name is already installed";
+            say "{$dist.name} is already installed";
             next TARGETLOOP;
         }
         my @deps = $mt.get-dependencies($dist);
