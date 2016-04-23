@@ -1,13 +1,12 @@
 {
     "name"        : "Module::Toolkit",
-    "version"     : "0.5",
-    "perl"	      : "6.c",
-    "description" : "Module management tools. Comes with a tiny installer",
+    "version"     : "0.6",
+    "perl"        : "6.c",
+    "description" : "Module management tools",
     "depends"     : [
         "File::Find",
         "Shell::Command",
         "JSON::Fast",
-        "File::Temp",
         "TAP::Harness"
     ],
     "source-url"  : "git://github.com/tadzik/Module-Toolkit.git",
