@@ -8,7 +8,7 @@ my $mt = Module::Toolkit.new;
 
 my $workdir = $*CWD.child('.redpanda-work');
 
-LEAVE rm_rf $workdir;
+#LEAVE rm_rf $workdir;
 
 class X::Redpanda is Exception {
 }
@@ -38,7 +38,7 @@ sub do-resolve(Distribution $dist,
             die X::Redpanda.new;
         }
     }
-    say "Installing {$dist.name}";
+    say "Installing {$dist.name} ($tmpdir)";
     $mt.install($tmpdir.IO, :force($force or $update));
     say "Successfully installed {$dist.name}";
 }
@@ -74,6 +74,7 @@ sub dist-from-location(Str $location) {
             depends       => @dep,
             build-depends => @bdep,
             test-depends  => @tdep,
+            source-url    => $tmpdir,
         );
     }
     return False;
