@@ -8,7 +8,7 @@ my $mt = Module::Toolkit.new;
 
 my $workdir = $*CWD.child('.redpanda-work');
 
-#LEAVE rm_rf $workdir;
+LEAVE rm_rf $workdir;
 
 class X::Redpanda is Exception {
 }
@@ -38,50 +38,14 @@ sub do-resolve(Distribution $dist,
             die X::Redpanda.new;
         }
     }
-    say "Installing {$dist.name} ($tmpdir)";
+    say "Installing {$dist.name}";
     $mt.install($tmpdir.IO, :force($force or $update));
     say "Successfully installed {$dist.name}";
 }
 
-sub find-meta-file(IO::Path() $dir) {
-    if $dir.child('META6.json').f {
-        return $dir.child('META6.json')
-    }
-    if $dir.child('META.info').f {
-        return $dir.child('META.info')
-    }
-}
-
-sub dist-from-location(Str $location) {
-    my $tmpdir = tempdir(:tempdir($workdir), :!unlink);
-    mkpath $tmpdir;
-    try {
-        $mt.fetch($location, $tmpdir.IO);
-        CATCH { default {
-            return False;
-        }}
-    }
-
-    my $meta = find-meta-file($tmpdir.IO);
-    if $meta {
-        my $dist = from-json slurp $meta;
-        my @dep  = |($dist<depends>:delete);
-        my @bdep = |($dist<build-depends>:delete);
-        my @tdep = |($dist<test-depends>:delete);
-
-        return Module::Toolkit::Distribution.new(
-            |$dist,
-            depends       => @dep,
-            build-depends => @bdep,
-            test-depends  => @tdep,
-            source-url    => $tmpdir,
-        );
-    }
-    return False;
-}
-
 sub MAIN(*@targets,
          Bool :$n = False, Bool :$notests = $n,
+         Bool :$d = False, Bool :$nodeps  = $d,
          Bool :$f = False, Bool :$force   = $f,
          Bool :$u = False, Bool :$update  = $u,
          Bool :$v = False, Bool :$verbose = $v) {
@@ -97,7 +61,9 @@ sub MAIN(*@targets,
     TARGETLOOP: for @targets -> $name {
         my $dist = $mt.get-project($name);
         unless $dist {
-            $dist = dist-from-location($name);
+            my $tmpdir = tempdir(:tempdir($workdir), :!unlink);
+            mkpath $tmpdir;
+            $dist = $mt.dist-from-location($name, $tmpdir.IO);
             if $dist {
                 say "Installing {$dist.name} "
                   ~ "from a custom location $name";
@@ -110,18 +76,22 @@ sub MAIN(*@targets,
             say "{$dist.name} is already installed";
             next TARGETLOOP;
         }
-        my @deps = $mt.get-dependencies($dist);
-        say "{$dist.name} depends on {@deps».name.join(", ")}" if +@deps;
-        for @deps -> $dep {
-            if should-skip($dep) {
-                say "{$dep.name} is already installed";
-                next;
+        unless $nodeps {
+            my @deps = $mt.get-dependencies($dist);
+            say "{$dist.name} depends on {@deps».name.join(", ")}"
+                if +@deps;
+            for @deps -> $dep {
+                if should-skip($dep) {
+                    say "{$dep.name} is already installed";
+                    next;
+                }
+                &resolve($dep);
+                CATCH { when X::Redpanda {
+                    say "Dependencies for {$dist.name} "
+                      ~ "could not be installed";
+                    next TARGETLOOP;
+                }}
             }
-            &resolve($dep);
-            CATCH { when X::Redpanda {
-                say "Dependencies for {$dist.name} could not be installed";
-                next TARGETLOOP;
-            }}
         }
         &resolve($dist);
         CATCH { when X::Redpanda {
