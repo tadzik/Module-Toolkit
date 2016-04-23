@@ -17,21 +17,18 @@ has $.installer
     handles <install>
     = Module::Toolkit::Installer.new;
 
-has CompUnit::Repository @repos
-    = <site home>.map({
-        CompUnit::RepositoryRegistry.repository-for-name($_)
-    });
-
 #| Check if a C<$dist>ribution is currently installed. If this returns
 #| True, you should be able to C<install()> it without C<:force>
 method is-installed(Distribution $dist) {
-    so any(@repos).resolve(
+    so $*REPO.resolve(
         CompUnit::DependencySpecification.new(
             :short-name($dist.name),
             :auth-matcher($dist.auth),
             :version-matcher($dist.version),
         )
-    ) or so any(@repos).prefix.child('dist').child($dist.id).IO.e;
+    ) or so any($*REPO.repo-chain.grep(
+                CompUnit::Repository::Installation
+            )).prefix.child('dist').child($dist.id).IO.e;
 }
 
 #| Fetch a given C<$dist>ribution, store in C<$to>
