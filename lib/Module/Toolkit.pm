@@ -23,7 +23,11 @@ has CompUnit::Repository @repos
 
 method is-installed(Distribution $dist) {
     so any(@repos).resolve(
-        CompUnit::DependencySpecification.new(:short-name($dist.name))
+        CompUnit::DependencySpecification.new(
+            :short-name($dist.name),
+            :auth-matcher($dist.auth),
+            :version-matcher($dist.version),
+        )
     ) or so any(@repos).prefix.child('dist').child($dist.id).IO.e;
 }
 
